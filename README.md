@@ -1,4 +1,4 @@
-![logo](logo.lowpoly.256x256.black.png)
+![logo](banner.png)
 
 ## Features
 
