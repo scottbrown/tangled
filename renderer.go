@@ -419,11 +419,109 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             color: #999;
             font-style: italic;
         }
+        .search-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            z-index: 1000;
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: border-color 0.2s;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+        .search-input::placeholder {
+            color: #999;
+        }
+        .search-clear {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: none;
+        }
+        .search-clear:hover {
+            color: #333;
+        }
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            display: none;
+        }
+        .search-result-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+        }
+        .search-result-item:hover,
+        .search-result-item.highlighted {
+            background-color: #f0f8ff;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-name {
+            font-weight: 500;
+            color: #333;
+        }
+        .search-result-match {
+            background-color: #ffeb3b;
+            font-weight: bold;
+        }
+        .search-no-results {
+            padding: 12px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+        .search-counter {
+            position: absolute;
+            right: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: #666;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <h1>Go Dependency Graph</h1>
     <div id="graph-container">
+        <div class="search-container">
+            <input type="text" class="search-input" id="search-input" placeholder="Search modules..." autocomplete="off">
+            <span class="search-counter" id="search-counter"></span>
+            <button class="search-clear" id="search-clear">×</button>
+            <div class="search-results" id="search-results"></div>
+        </div>
         <div class="breadcrumb-container">
             <div class="breadcrumb" id="breadcrumb">
                 <span class="breadcrumb-empty">Click a node to see its dependency path</span>
@@ -926,6 +1024,251 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
         d3.select(".breadcrumb-container").on("mousedown", function(event) {
             event.stopPropagation();
         });
+
+        // Search functionality implementation
+        const searchInput = d3.select("#search-input");
+        const searchResults = d3.select("#search-results");
+        const searchCounter = d3.select("#search-counter");
+        const searchClear = d3.select("#search-clear");
+        
+        let currentSearchTerm = "";
+        let searchMatches = [];
+        let highlightedResultIndex = -1;
+
+        // Filter nodes based on search term
+        function searchNodes(term) {
+            if (!term || term.length < 2) {
+                return [];
+            }
+            
+            const lowerTerm = term.toLowerCase();
+            return nodes.filter(node => 
+                node.name.toLowerCase().includes(lowerTerm)
+            );
+        }
+
+        // Highlight search term in text
+        function highlightSearchTerm(text, term) {
+            if (!term) return text;
+            
+            const regex = new RegExp('(' + term.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + ')', 'gi');
+            return text.replace(regex, '<span class="search-result-match">$1</span>');
+        }
+
+        // Update search results display
+        function updateSearchResults(matches) {
+            if (matches.length === 0) {
+                if (currentSearchTerm.length >= 2) {
+                    searchResults.html('<div class="search-no-results">No modules found</div>');
+                    searchResults.style("display", "block");
+                } else {
+                    searchResults.style("display", "none");
+                }
+                searchCounter.text("");
+                return;
+            }
+            
+            searchCounter.text(matches.length + " found");
+            
+            let resultsHtml = matches.slice(0, 50).map((node, index) => {
+                const highlightedName = highlightSearchTerm(node.name, currentSearchTerm);
+                return '<div class="search-result-item" data-node-id="' + node.id + '" data-index="' + index + '">' +
+                       '<div class="search-result-name">' + highlightedName + '</div>' +
+                       '</div>';
+            }).join('');
+            
+            if (matches.length > 50) {
+                resultsHtml += '<div class="search-no-results">... and ' + (matches.length - 50) + ' more results</div>';
+            }
+            
+            searchResults.html(resultsHtml);
+            searchResults.style("display", "block");
+            
+            highlightedResultIndex = -1;
+        }
+
+        // Highlight matching nodes in the graph
+        function highlightSearchMatches(matches) {
+            if (matches.length === 0) {
+                // Reset all node highlighting
+                node.attr("fill", d => d.group === 2 ? "#ff6b6b" : "#4ecdc4")
+                    .attr("r", 8)
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 1.5);
+                return;
+            }
+            
+            const matchIds = new Set(matches.map(n => n.id));
+            
+            node.attr("fill", d => {
+                if (matchIds.has(d.id)) {
+                    return d.group === 2 ? "#ff0000" : "#00cc00";
+                }
+                return d.group === 2 ? "#ff6b6b" : "#cccccc";
+            })
+            .attr("r", d => matchIds.has(d.id) ? 10 : 6)
+            .attr("stroke", d => matchIds.has(d.id) ? "#333" : "#fff")
+            .attr("stroke-width", d => matchIds.has(d.id) ? 2 : 1);
+        }
+
+        // Center view on a specific node
+        function centerOnNode(node) {
+            const transform = d3.zoomTransform(svg.node());
+            const newX = width / 2 - node.x * transform.k;
+            const newY = height / 2 - node.y * transform.k;
+            
+            svg.transition().duration(500).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(newX, newY).scale(transform.k)
+            );
+        }
+
+        // Handle search input
+        searchInput.on("input", function() {
+            const term = this.value.trim();
+            currentSearchTerm = term;
+            
+            if (term.length === 0) {
+                searchClear.style("display", "none");
+                searchResults.style("display", "none");
+                searchCounter.text("");
+                highlightSearchMatches([]);
+                searchMatches = [];
+                return;
+            }
+            
+            searchClear.style("display", "block");
+            
+            if (term.length < 2) {
+                searchResults.style("display", "none");
+                searchCounter.text("");
+                highlightSearchMatches([]);
+                searchMatches = [];
+                return;
+            }
+            
+            searchMatches = searchNodes(term);
+            updateSearchResults(searchMatches);
+            highlightSearchMatches(searchMatches);
+        });
+
+        // Handle clear button
+        searchClear.on("click", function() {
+            searchInput.node().value = "";
+            currentSearchTerm = "";
+            searchMatches = [];
+            searchClear.style("display", "none");
+            searchResults.style("display", "none");
+            searchCounter.text("");
+            highlightSearchMatches([]);
+        });
+
+        // Handle search result clicks
+        searchResults.on("click", function(event) {
+            const item = event.target.closest(".search-result-item");
+            if (item) {
+                const nodeId = parseInt(item.getAttribute("data-node-id"));
+                const node = nodes.find(n => n.id === nodeId);
+                if (node) {
+                    centerOnNode(node);
+                    selectedNode = node;
+                    updateBreadcrumb(node);
+                    highlightPath(node);
+                    searchResults.style("display", "none");
+                }
+            }
+        });
+
+        // Prevent search container from interfering with interactions
+        d3.select(".search-container").on("mousedown", function(event) {
+            event.stopPropagation();
+        });
+
+        // Hide search results when clicking elsewhere
+        d3.select("body").on("click", function(event) {
+            if (!event.target.closest(".search-container")) {
+                searchResults.style("display", "none");
+            }
+        });
+
+        // Keyboard navigation for search results
+        searchInput.on("keydown", function(event) {
+            const resultsVisible = searchResults.style("display") !== "none";
+            const resultItems = searchResults.selectAll(".search-result-item").nodes();
+            
+            if (!resultsVisible || resultItems.length === 0) return;
+            
+            switch(event.key) {
+                case "ArrowDown":
+                    event.preventDefault();
+                    highlightedResultIndex = Math.min(highlightedResultIndex + 1, resultItems.length - 1);
+                    updateResultHighlight(resultItems);
+                    break;
+                    
+                case "ArrowUp":
+                    event.preventDefault();
+                    highlightedResultIndex = Math.max(highlightedResultIndex - 1, -1);
+                    updateResultHighlight(resultItems);
+                    break;
+                    
+                case "Enter":
+                    event.preventDefault();
+                    if (highlightedResultIndex >= 0 && highlightedResultIndex < resultItems.length) {
+                        const nodeId = parseInt(resultItems[highlightedResultIndex].getAttribute("data-node-id"));
+                        const node = nodes.find(n => n.id === nodeId);
+                        if (node) {
+                            centerOnNode(node);
+                            selectedNode = node;
+                            updateBreadcrumb(node);
+                            highlightPath(node);
+                            searchResults.style("display", "none");
+                            highlightedResultIndex = -1;
+                        }
+                    } else if (searchMatches.length > 0) {
+                        // If no result is highlighted, select the first one
+                        const node = searchMatches[0];
+                        centerOnNode(node);
+                        selectedNode = node;
+                        updateBreadcrumb(node);
+                        highlightPath(node);
+                        searchResults.style("display", "none");
+                        highlightedResultIndex = -1;
+                    }
+                    break;
+                    
+                case "Escape":
+                    searchResults.style("display", "none");
+                    highlightedResultIndex = -1;
+                    break;
+            }
+        });
+
+        // Update highlighted result in dropdown
+        function updateResultHighlight(resultItems) {
+            resultItems.forEach((item, index) => {
+                if (index === highlightedResultIndex) {
+                    item.classList.add("highlighted");
+                } else {
+                    item.classList.remove("highlighted");
+                }
+            });
+            
+            // Scroll highlighted item into view
+            if (highlightedResultIndex >= 0) {
+                const highlightedItem = resultItems[highlightedResultIndex];
+                const resultsContainer = searchResults.node();
+                const itemTop = highlightedItem.offsetTop;
+                const itemBottom = itemTop + highlightedItem.offsetHeight;
+                const containerTop = resultsContainer.scrollTop;
+                const containerBottom = containerTop + resultsContainer.offsetHeight;
+                
+                if (itemTop < containerTop) {
+                    resultsContainer.scrollTop = itemTop;
+                } else if (itemBottom > containerBottom) {
+                    resultsContainer.scrollTop = itemBottom - resultsContainer.offsetHeight;
+                }
+            }
+        }
     </script>
 </body>
 </html>`
