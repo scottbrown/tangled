@@ -1,0 +1,20 @@
+---
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: checkout the code
+        uses: actions/checkout@v4
+      - name: install go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+      - name: build a local artifact (also runs tests)
+        run: task build
