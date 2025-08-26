@@ -329,6 +329,40 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             border-radius: 4px;
             overflow: hidden;
         }
+        .minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 150px;
+            border: 2px solid #666;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+        }
+        .minimap svg {
+            width: 100%;
+            height: 100%;
+        }
+        .minimap .minimap-node {
+            fill: #4ecdc4;
+            stroke: none;
+        }
+        .minimap .minimap-node.main {
+            fill: #ff6b6b;
+        }
+        .minimap .minimap-link {
+            stroke: #999;
+            stroke-width: 0.5px;
+            stroke-opacity: 0.3;
+        }
+        .minimap .viewport {
+            fill: rgba(0, 100, 200, 0.2);
+            stroke: #0064c8;
+            stroke-width: 2px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -340,6 +374,7 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             <button class="zoom-button" id="reset-zoom" style="font-size: 14px;">⌂</button>
         </div>
         <div id="graph"></div>
+        <div class="minimap" id="minimap"></div>
     </div>
     <div id="tooltip"></div>
 
@@ -472,6 +507,159 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
 
         // Prevent zoom controls from interfering with drag
         d3.selectAll(".zoom-controls").on("mousedown", function(event) {
+            event.stopPropagation();
+        });
+
+        // Minimap implementation
+        const minimapWidth = 200;
+        const minimapHeight = 150;
+        
+        const minimapSvg = d3.select("#minimap")
+            .append("svg")
+            .attr("width", minimapWidth)
+            .attr("height", minimapHeight);
+
+        const minimapG = minimapSvg.append("g");
+
+        // Calculate bounds of all nodes
+        function calculateGraphBounds() {
+            if (nodes.length === 0) return { minX: 0, minY: 0, maxX: width, maxY: height };
+            
+            let minX = d3.min(nodes, d => d.x || 0);
+            let maxX = d3.max(nodes, d => d.x || 0);
+            let minY = d3.min(nodes, d => d.y || 0);
+            let maxY = d3.max(nodes, d => d.y || 0);
+            
+            // Add padding
+            const padding = 50;
+            minX -= padding;
+            maxX += padding;
+            minY -= padding;
+            maxY += padding;
+            
+            return { minX, minY, maxX, maxY };
+        }
+
+        // Create minimap scale functions
+        let minimapScaleX, minimapScaleY;
+        
+        function updateMinimapScales() {
+            const bounds = calculateGraphBounds();
+            const graphWidth = bounds.maxX - bounds.minX;
+            const graphHeight = bounds.maxY - bounds.minY;
+            
+            minimapScaleX = d3.scaleLinear()
+                .domain([bounds.minX, bounds.maxX])
+                .range([0, minimapWidth]);
+                
+            minimapScaleY = d3.scaleLinear()
+                .domain([bounds.minY, bounds.maxY])
+                .range([0, minimapHeight]);
+        }
+
+        // Create minimap elements
+        const minimapLinks = minimapG.selectAll(".minimap-link")
+            .data(links)
+            .join("line")
+            .attr("class", "minimap-link");
+
+        const minimapNodes = minimapG.selectAll(".minimap-node")
+            .data(nodes)
+            .join("circle")
+            .attr("class", d => d.group === 2 ? "minimap-node main" : "minimap-node")
+            .attr("r", 1.5);
+
+        // Viewport indicator
+        const viewport = minimapSvg.append("rect")
+            .attr("class", "viewport");
+
+        // Update minimap positions
+        function updateMinimap() {
+            updateMinimapScales();
+            
+            minimapLinks
+                .attr("x1", d => minimapScaleX(d.source.x))
+                .attr("y1", d => minimapScaleY(d.source.y))
+                .attr("x2", d => minimapScaleX(d.target.x))
+                .attr("y2", d => minimapScaleY(d.target.y));
+
+            minimapNodes
+                .attr("cx", d => minimapScaleX(d.x))
+                .attr("cy", d => minimapScaleY(d.y));
+                
+            updateViewportIndicator();
+        }
+
+        // Update viewport indicator based on current zoom/pan
+        function updateViewportIndicator() {
+            if (!minimapScaleX || !minimapScaleY) return;
+            
+            const transform = d3.zoomTransform(svg.node());
+            const bounds = calculateGraphBounds();
+            
+            // Calculate visible area in graph coordinates
+            const visibleLeft = (-transform.x) / transform.k;
+            const visibleTop = (-transform.y) / transform.k;
+            const visibleRight = visibleLeft + width / transform.k;
+            const visibleBottom = visibleTop + height / transform.k;
+            
+            // Convert to minimap coordinates
+            const minimapLeft = minimapScaleX(visibleLeft);
+            const minimapTop = minimapScaleY(visibleTop);
+            const minimapRight = minimapScaleX(visibleRight);
+            const minimapBottom = minimapScaleY(visibleBottom);
+            
+            viewport
+                .attr("x", Math.max(0, minimapLeft))
+                .attr("y", Math.max(0, minimapTop))
+                .attr("width", Math.max(0, Math.min(minimapWidth, minimapRight) - Math.max(0, minimapLeft)))
+                .attr("height", Math.max(0, Math.min(minimapHeight, minimapBottom) - Math.max(0, minimapTop)));
+        }
+
+        // Update minimap on simulation tick
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+                
+            updateMinimap();
+        });
+
+        // Update viewport indicator on zoom
+        zoom.on("zoom", function(event) {
+            g.attr("transform", event.transform);
+            updateViewportIndicator();
+        });
+
+        // Minimap click interaction - pan to clicked location
+        minimapSvg.on("click", function(event) {
+            if (!minimapScaleX || !minimapScaleY) return;
+            
+            const [mouseX, mouseY] = d3.pointer(event);
+            
+            // Convert minimap coordinates back to graph coordinates
+            const graphX = minimapScaleX.invert(mouseX);
+            const graphY = minimapScaleY.invert(mouseY);
+            
+            // Center the main view on this point
+            const transform = d3.zoomTransform(svg.node());
+            const newX = width / 2 - graphX * transform.k;
+            const newY = height / 2 - graphY * transform.k;
+            
+            svg.transition().duration(500).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(newX, newY).scale(transform.k)
+            );
+        });
+
+        // Prevent minimap from interfering with main graph interactions
+        d3.select("#minimap").on("mousedown", function(event) {
             event.stopPropagation();
         });
     </script>
