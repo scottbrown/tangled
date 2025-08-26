@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/scottbrown/godepviewer/cmd/godepviewer/cmd"
+	"github.com/scottbrown/tangled/cmd/tangled/cmd"
 )
 
 func main() {

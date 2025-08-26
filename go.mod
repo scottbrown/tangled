@@ -1,4 +1,4 @@
-module github.com/scottbrown/godepviewer
+module github.com/scottbrown/tangled
 
 go 1.24.5
 

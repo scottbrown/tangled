@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/scottbrown/godepviewer"
+	"github.com/scottbrown/tangled"
 	"github.com/spf13/cobra"
 )
 
@@ -17,16 +17,16 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "godepviewer [graph-file]",
+	Use:   "tangled [graph-file]",
 	Short: "Visualize Go module dependency graphs",
-	Long: `godepviewer parses the output from 'go mod graph' and generates
+	Long: `tangled parses the output from 'go mod graph' and generates
 various visualization formats including plaintext tree, HTML/D3, MermaidJS, and GraphViz DOT.
 
 Example usage:
   go mod graph > deps.graph
-  godepviewer deps.graph
-  godepviewer -f html -o deps.html deps.graph
-  godepviewer -f mermaid -o deps.mmd deps.graph`,
+  tangled deps.graph
+  tangled -f html -o deps.html deps.graph
+  tangled -f mermaid -o deps.mmd deps.graph`,
 	Args: cobra.ExactArgs(1),
 	RunE: runRoot,
 }
@@ -35,22 +35,22 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	inputFile := args[0]
 
 	// Parse the dependency graph
-	graph, err := godepviewer.ParseGraphFromFile(inputFile)
+	graph, err := tangled.ParseGraphFromFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse graph file: %w", err)
 	}
 
 	// Create the appropriate renderer
-	var renderer godepviewer.Renderer
+	var renderer tangled.Renderer
 	switch strings.ToLower(outputFormat) {
 	case "text", "plaintext", "tree":
-		renderer = godepviewer.NewPlaintextRenderer()
+		renderer = tangled.NewPlaintextRenderer()
 	case "html", "d3":
-		renderer = godepviewer.NewHTMLRenderer()
+		renderer = tangled.NewHTMLRenderer()
 	case "mermaid", "mmd":
-		renderer = godepviewer.NewMermaidRenderer()
+		renderer = tangled.NewMermaidRenderer()
 	case "dot", "graphviz":
-		renderer = godepviewer.NewGraphvizRenderer()
+		renderer = tangled.NewGraphvizRenderer()
 	default:
 		return fmt.Errorf("unsupported output format: %s (supported: text, html, mermaid, dot)", outputFormat)
 	}
@@ -69,7 +69,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	}
 
 	// Render the graph
-	if htmlRenderer, ok := renderer.(*godepviewer.HTMLRenderer); ok {
+	if htmlRenderer, ok := renderer.(*tangled.HTMLRenderer); ok {
 		// For HTML renderer, pass the filename for dynamic title
 		filename := filepath.Base(inputFile)
 		if err := htmlRenderer.RenderWithFilename(graph, writer, filename); err != nil {

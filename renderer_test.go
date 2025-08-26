@@ -1,4 +1,4 @@
-package godepviewer
+package tangled
 
 import (
 	"bytes"

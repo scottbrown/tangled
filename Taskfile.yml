@@ -5,8 +5,8 @@ output: prefixed
 vars:
   BUILD_DIR: .build
   TEST_DIR: .test
-  BINARY_NAME: godepviewer
-  MAIN_PACKAGE: ./cmd/godepviewer
+  BINARY_NAME: tangled
+  MAIN_PACKAGE: ./cmd/tangled
 
 tasks:
   default:

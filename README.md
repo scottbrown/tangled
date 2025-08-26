@@ -14,14 +14,14 @@ A Go tool that visualizes `go mod graph` output in multiple formats for easy dep
 ### Using Go Install
 
 ```bash
-go install github.com/scottbrown/godepviewer/cmd/godepviewer@latest
+go install github.com/scottbrown/tangled/cmd/tangled@latest
 ```
 
 ### Building from Source
 
 ```bash
-git clone https://github.com/scottbrown/godepviewer.git
-cd godepviewer
+git clone https://github.com/scottbrown/tangled.git
+cd tangled
 task build
 ```
 
@@ -39,28 +39,28 @@ Then visualize it:
 
 ```bash
 # Plaintext tree (default)
-godepviewer deps.graph
+tangled deps.graph
 
 # HTML with D3.js visualization
-godepviewer -f html -o deps.html deps.graph
+tangled -f html -o deps.html deps.graph
 
 # MermaidJS format
-godepviewer -f mermaid -o deps.mmd deps.graph
+tangled -f mermaid -o deps.mmd deps.graph
 
 # GraphViz DOT format
-godepviewer -f dot -o deps.dot deps.graph
+tangled -f dot -o deps.dot deps.graph
 ```
 
 ### Command-line Options
 
 ```
 Usage:
-  godepviewer [graph-file]
+  tangled [graph-file]
 
 Flags:
   -f, --format string   Output format (text, html, mermaid, dot) (default "text")
   -o, --output string   Output file (default: stdout)
-  -h, --help           help for godepviewer
+  -h, --help           help for tangled
 ```
 
 ### Output Formats
@@ -124,9 +124,9 @@ task dev
 ### Project Structure
 
 ```
-godepviewer/
+tangled/
 ├── cmd/
-│   └── godepviewer/        # CLI entry point
+│   └── tangled/        # CLI entry point
 ├── .build/                 # Build artifacts
 ├── .test/                  # Test artifacts
 ├── parser.go              # Graph parsing logic
@@ -163,10 +163,10 @@ cd /path/to/your/go/project
 go mod graph > deps.graph
 
 # Create interactive HTML visualization
-godepviewer -f html -o dependency-analysis.html deps.graph
+tangled -f html -o dependency-analysis.html deps.graph
 
 # Generate MermaidJS for documentation
-godepviewer -f mermaid -o dependencies.mmd deps.graph
+tangled -f mermaid -o dependencies.mmd deps.graph
 ```
 
 ### Integration with CI/CD
@@ -176,7 +176,7 @@ godepviewer -f mermaid -o dependencies.mmd deps.graph
 - name: Generate Dependency Visualization
   run: |
     go mod graph > deps.graph
-    godepviewer -f html -o deps.html deps.graph
+    tangled -f html -o deps.html deps.graph
     
 - name: Upload Dependency Report
   uses: actions/upload-artifact@v3
