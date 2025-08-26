@@ -363,11 +363,72 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             stroke-width: 2px;
             pointer-events: none;
         }
+        .breadcrumb-container {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            right: 240px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+            white-space: nowrap;
+            font-size: 14px;
+            line-height: 24px;
+        }
+        .breadcrumb {
+            display: inline-block;
+            color: #666;
+        }
+        .breadcrumb-item {
+            display: inline-block;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: top;
+            color: #0066cc;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+        .breadcrumb-item:hover {
+            background-color: #f0f8ff;
+            text-decoration: underline;
+        }
+        .breadcrumb-item.root {
+            color: #cc0000;
+            font-weight: bold;
+        }
+        .breadcrumb-item.current {
+            color: #333;
+            background-color: #e6f3ff;
+            cursor: default;
+        }
+        .breadcrumb-item.current:hover {
+            text-decoration: none;
+        }
+        .breadcrumb-separator {
+            margin: 0 8px;
+            color: #999;
+        }
+        .breadcrumb-empty {
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <h1>Go Dependency Graph</h1>
     <div id="graph-container">
+        <div class="breadcrumb-container">
+            <div class="breadcrumb" id="breadcrumb">
+                <span class="breadcrumb-empty">Click a node to see its dependency path</span>
+            </div>
+        </div>
         <div class="zoom-controls">
             <button class="zoom-button" id="zoom-in">+</button>
             <button class="zoom-button" id="zoom-out">−</button>
@@ -449,6 +510,12 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
         })
         .on("mouseout", function() {
             tooltip.style("opacity", 0);
+        })
+        .on("click", function(event, d) {
+            event.stopPropagation();
+            selectedNode = d;
+            updateBreadcrumb(d);
+            highlightPath(d);
         });
 
         simulation.on("tick", () => {
@@ -660,6 +727,203 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
 
         // Prevent minimap from interfering with main graph interactions
         d3.select("#minimap").on("mousedown", function(event) {
+            event.stopPropagation();
+        });
+
+        // Breadcrumb trail implementation
+        const mainModuleName = nodes.find(n => n.group === 2)?.name || nodes[0]?.name;
+        let selectedNode = null;
+
+        // Build adjacency list for path finding (reversed - from dependencies to dependents)
+        const dependents = new Map();
+        links.forEach(link => {
+            const fromId = link.source.id || link.source;
+            const toId = link.target.id || link.target;
+            
+            if (!dependents.has(toId)) {
+                dependents.set(toId, []);
+            }
+            dependents.get(toId).push(fromId);
+        });
+
+        // Find path from main module to target node using BFS
+        function findPathToNode(targetNodeId) {
+            if (!mainModuleName) return [];
+            
+            const mainNode = nodes.find(n => n.name === mainModuleName);
+            if (!mainNode || mainNode.id === targetNodeId) return [mainNode];
+            
+            const queue = [{node: mainNode, path: [mainNode]}];
+            const visited = new Set([mainNode.id]);
+            
+            while (queue.length > 0) {
+                const {node, path} = queue.shift();
+                
+                // Get direct dependencies of current node
+                const nodeDependencies = links
+                    .filter(link => {
+                        const sourceId = link.source.id || link.source;
+                        return sourceId === node.id;
+                    })
+                    .map(link => {
+                        const targetId = link.target.id || link.target;
+                        return nodes.find(n => n.id === targetId);
+                    })
+                    .filter(n => n);
+                
+                for (const depNode of nodeDependencies) {
+                    if (depNode.id === targetNodeId) {
+                        return [...path, depNode];
+                    }
+                    
+                    if (!visited.has(depNode.id)) {
+                        visited.add(depNode.id);
+                        queue.push({node: depNode, path: [...path, depNode]});
+                    }
+                }
+            }
+            
+            return []; // No path found
+        }
+
+        // Update breadcrumb display
+        function updateBreadcrumb(targetNode) {
+            const breadcrumbEl = d3.select("#breadcrumb");
+            
+            if (!targetNode) {
+                breadcrumbEl.html('<span class="breadcrumb-empty">Click a node to see its dependency path</span>');
+                return;
+            }
+            
+            const path = findPathToNode(targetNode.id);
+            
+            if (path.length === 0) {
+                breadcrumbEl.html(
+                    '<span class="breadcrumb-empty">No dependency path found to:</span>' +
+                    '<span class="breadcrumb-item current">' + truncateModuleName(targetNode.name) + '</span>'
+                );
+                return;
+            }
+            
+            let html = '';
+            path.forEach((node, index) => {
+                const isRoot = node.group === 2;
+                const isCurrent = index === path.length - 1;
+                const classes = ['breadcrumb-item'];
+                
+                if (isRoot) classes.push('root');
+                if (isCurrent) classes.push('current');
+                
+                const truncatedName = truncateModuleName(node.name);
+                
+                if (index > 0) {
+                    html += '<span class="breadcrumb-separator">→</span>';
+                }
+                
+                html += '<span class="' + classes.join(' ') + '" data-node-id="' + node.id + '" title="' + node.name + '">' + truncatedName + '</span>';
+            });
+            
+            breadcrumbEl.html(html);
+        }
+
+        // Truncate long module names for display
+        function truncateModuleName(name) {
+            if (name.length <= 40) return name;
+            
+            const parts = name.split('/');
+            if (parts.length > 2) {
+                return parts[0] + '/.../' + parts[parts.length - 1];
+            }
+            
+            return name.substring(0, 37) + '...';
+        }
+
+        // Highlight path in the graph
+        function highlightPath(targetNode) {
+            // Reset all highlighting
+            node.attr("stroke", "#fff").attr("stroke-width", 1.5);
+            link.attr("stroke", "#999").attr("stroke-opacity", 0.6);
+            
+            if (!targetNode) return;
+            
+            const path = findPathToNode(targetNode.id);
+            if (path.length === 0) return;
+            
+            // Highlight path nodes
+            const pathNodeIds = new Set(path.map(n => n.id));
+            node.attr("stroke", d => pathNodeIds.has(d.id) ? "#ff6600" : "#fff")
+                .attr("stroke-width", d => pathNodeIds.has(d.id) ? 3 : 1.5);
+            
+            // Highlight path links
+            const pathLinks = [];
+            for (let i = 0; i < path.length - 1; i++) {
+                const fromId = path[i].id;
+                const toId = path[i + 1].id;
+                
+                const pathLink = links.find(link => {
+                    const sourceId = link.source.id || link.source;
+                    const targetId = link.target.id || link.target;
+                    return sourceId === fromId && targetId === toId;
+                });
+                
+                if (pathLink) pathLinks.push(pathLink);
+            }
+            
+            link.attr("stroke", d => {
+                const sourceId = d.source.id || d.source;
+                const targetId = d.target.id || d.target;
+                return pathLinks.some(pl => {
+                    const plSourceId = pl.source.id || pl.source;
+                    const plTargetId = pl.target.id || pl.target;
+                    return plSourceId === sourceId && plTargetId === targetId;
+                }) ? "#ff6600" : "#999";
+            })
+            .attr("stroke-opacity", d => {
+                const sourceId = d.source.id || d.source;
+                const targetId = d.target.id || d.target;
+                return pathLinks.some(pl => {
+                    const plSourceId = pl.source.id || pl.source;
+                    const plTargetId = pl.target.id || pl.target;
+                    return plSourceId === sourceId && plTargetId === targetId;
+                }) ? 1 : 0.6;
+            });
+        }
+
+        // Add breadcrumb click navigation
+        d3.select("#breadcrumb").on("click", function(event) {
+            const target = event.target;
+            if (target.classList.contains("breadcrumb-item") && !target.classList.contains("current")) {
+                const nodeId = parseInt(target.getAttribute("data-node-id"));
+                const node = nodes.find(n => n.id === nodeId);
+                if (node) {
+                    selectedNode = node;
+                    updateBreadcrumb(node);
+                    highlightPath(node);
+                    
+                    // Center view on selected node
+                    const transform = d3.zoomTransform(svg.node());
+                    const newX = width / 2 - node.x * transform.k;
+                    const newY = height / 2 - node.y * transform.k;
+                    
+                    svg.transition().duration(500).call(
+                        zoom.transform,
+                        d3.zoomIdentity.translate(newX, newY).scale(transform.k)
+                    );
+                }
+            }
+        });
+
+        // Clear selection when clicking on empty space
+        svg.on("click", function(event) {
+            if (event.target === this) {
+                selectedNode = null;
+                updateBreadcrumb(null);
+                highlightPath(null);
+            }
+        });
+
+        // Prevent breadcrumb container from interfering with interactions
+        d3.select(".breadcrumb-container").on("mousedown", function(event) {
             event.stopPropagation();
         });
     </script>
