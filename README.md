@@ -1,4 +1,6 @@
-# Go Dependency Viewer
+![logo](logo.lowpoly.256x256.black.png)
+
+# Tangled
 
 A Go tool that visualizes `go mod graph` output in multiple formats for easy dependency analysis.
 
