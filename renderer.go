@@ -419,6 +419,48 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             color: #999;
             font-style: italic;
         }
+        .breadcrumb-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .breadcrumb-toggle:hover {
+            background-color: #f0f0f0;
+            border-color: #999;
+        }
+        .breadcrumb-container.collapsed {
+            height: 32px;
+            padding: 4px 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .breadcrumb-container.collapsed .breadcrumb {
+            opacity: 0;
+            pointer-events: none;
+            position: absolute;
+            left: -9999px;
+        }
+        .breadcrumb-container.collapsed .breadcrumb-toggle {
+            position: static;
+            transform: none;
+            margin: 0;
+            flex-shrink: 0;
+        }
         .search-container {
             position: absolute;
             top: 20px;
@@ -522,10 +564,11 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             <button class="search-clear" id="search-clear">×</button>
             <div class="search-results" id="search-results"></div>
         </div>
-        <div class="breadcrumb-container">
+        <div class="breadcrumb-container" id="breadcrumb-container">
             <div class="breadcrumb" id="breadcrumb">
                 <span class="breadcrumb-empty">Click a node to see its dependency path</span>
             </div>
+            <button class="breadcrumb-toggle" id="breadcrumb-toggle" title="Toggle breadcrumb visibility (B)">−</button>
         </div>
         <div class="zoom-controls">
             <button class="zoom-button" id="zoom-in">+</button>
@@ -1025,6 +1068,29 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
             event.stopPropagation();
         });
 
+        // Breadcrumb toggle functionality
+        const breadcrumbContainer = d3.select("#breadcrumb-container");
+        const breadcrumbToggle = d3.select("#breadcrumb-toggle");
+        let breadcrumbVisible = true;
+
+        function toggleBreadcrumb() {
+            breadcrumbVisible = !breadcrumbVisible;
+            
+            if (breadcrumbVisible) {
+                breadcrumbContainer.classed("collapsed", false);
+                breadcrumbToggle.text("−").attr("title", "Toggle breadcrumb visibility (B)");
+            } else {
+                breadcrumbContainer.classed("collapsed", true);
+                breadcrumbToggle.text("+").attr("title", "Toggle breadcrumb visibility (B)");
+            }
+        }
+
+        // Toggle button click handler
+        breadcrumbToggle.on("click", function(event) {
+            event.stopPropagation();
+            toggleBreadcrumb();
+        });
+
         // Search functionality implementation
         const searchInput = d3.select("#search-input");
         const searchResults = d3.select("#search-results");
@@ -1269,6 +1335,21 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
                 }
             }
         }
+
+        // Global keyboard shortcuts
+        d3.select("body").on("keydown", function(event) {
+            // Only trigger if not typing in an input field
+            if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") {
+                return;
+            }
+            
+            switch(event.key.toLowerCase()) {
+                case "b":
+                    event.preventDefault();
+                    toggleBreadcrumb();
+                    break;
+            }
+        });
     </script>
 </body>
 </html>`
