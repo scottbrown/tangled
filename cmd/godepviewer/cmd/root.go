@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/scottbrown/godepviewer"
@@ -68,8 +69,17 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	}
 
 	// Render the graph
-	if err := renderer.Render(graph, writer); err != nil {
-		return fmt.Errorf("failed to render graph: %w", err)
+	if htmlRenderer, ok := renderer.(*godepviewer.HTMLRenderer); ok {
+		// For HTML renderer, pass the filename for dynamic title
+		filename := filepath.Base(inputFile)
+		if err := htmlRenderer.RenderWithFilename(graph, writer, filename); err != nil {
+			return fmt.Errorf("failed to render graph: %w", err)
+		}
+	} else {
+		// For other renderers, use the standard render method
+		if err := renderer.Render(graph, writer); err != nil {
+			return fmt.Errorf("failed to render graph: %w", err)
+		}
 	}
 
 	// Print success message to stderr if outputting to file

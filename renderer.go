@@ -12,6 +12,12 @@ type Renderer interface {
 	Render(graph *DependencyGraph, writer io.Writer) error
 }
 
+// FileAwareRenderer extends Renderer to accept filename information
+type FileAwareRenderer interface {
+	Renderer
+	RenderWithFilename(graph *DependencyGraph, writer io.Writer, filename string) error
+}
+
 // PlaintextRenderer renders the dependency graph as plaintext tree
 type PlaintextRenderer struct{}
 
@@ -200,6 +206,11 @@ func NewHTMLRenderer() *HTMLRenderer {
 
 // Render renders the dependency graph as HTML with D3.js visualization
 func (r *HTMLRenderer) Render(graph *DependencyGraph, writer io.Writer) error {
+	return r.RenderWithFilename(graph, writer, "Go Dependency Graph")
+}
+
+// RenderWithFilename renders the dependency graph as HTML with a specific filename for title
+func (r *HTMLRenderer) RenderWithFilename(graph *DependencyGraph, writer io.Writer, filename string) error {
 	template := r.getHTMLTemplate()
 
 	// Generate nodes and links for D3
@@ -207,7 +218,8 @@ func (r *HTMLRenderer) Render(graph *DependencyGraph, writer io.Writer) error {
 	links := r.generateLinks(graph)
 
 	// Replace placeholders in template
-	html := strings.ReplaceAll(template, "{{NODES}}", nodes)
+	html := strings.ReplaceAll(template, "{{TITLE}}", filename)
+	html = strings.ReplaceAll(html, "{{NODES}}", nodes)
 	html = strings.ReplaceAll(html, "{{LINKS}}", links)
 
 	_, err := writer.Write([]byte(html))
@@ -261,7 +273,7 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
 	return `<!DOCTYPE html>
 <html>
 <head>
-    <title>Go Dependency Graph</title>
+    <title>{{TITLE}}</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
@@ -556,7 +568,7 @@ func (r *HTMLRenderer) getHTMLTemplate() string {
     </style>
 </head>
 <body>
-    <h1>Go Dependency Graph</h1>
+    <h1>{{TITLE}}</h1>
     <div id="graph-container">
         <div class="search-container">
             <input type="text" class="search-input" id="search-input" placeholder="Search modules..." autocomplete="off">
