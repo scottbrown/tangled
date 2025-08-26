@@ -7,6 +7,12 @@
 - **Command-line Interface**: Simple CLI built with Cobra for easy integration into workflows
 - **High Performance**: Efficient parsing and rendering of large dependency graphs
 
+## Example
+
+The following image is of the dependency graph for this project.
+
+![artifact-tangled](html.artifact.png)
+
 ## Installation
 
 ### Using Go Install
