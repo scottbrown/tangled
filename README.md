@@ -1,9 +1,5 @@
 ![logo](logo.lowpoly.256x256.black.png)
 
-# Tangled
-
-A Go tool that visualizes `go mod graph` output in multiple formats for easy dependency analysis.
-
 ## Features
 
 - **Multiple Output Formats**: Generate visualizations in plaintext tree, HTML/D3, MermaidJS, and GraphViz DOT formats
