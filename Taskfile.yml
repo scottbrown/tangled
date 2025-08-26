@@ -1,0 +1,76 @@
+version: '3'
+
+output: prefixed
+
+vars:
+  BUILD_DIR: .build
+  TEST_DIR: .test
+  BINARY_NAME: godepviewer
+  MAIN_PACKAGE: ./cmd/godepviewer
+
+tasks:
+  default:
+    cmds:
+      - task: build
+
+  clean:
+    desc: Clean build and test artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - rm -rf {{.TEST_DIR}}
+      - mkdir -p {{.BUILD_DIR}}
+      - mkdir -p {{.TEST_DIR}}
+
+  deps:
+    desc: Download and tidy dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  format:
+    desc: Format Go code
+    cmds:
+      - go fmt ./...
+
+  lint:
+    desc: Run linting
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: Run tests with coverage
+    deps: [clean]
+    cmds:
+      - go test -v -race -coverprofile={{.TEST_DIR}}/coverage.out ./...
+      - go tool cover -html={{.TEST_DIR}}/coverage.out -o {{.TEST_DIR}}/coverage.html
+      - go tool cover -func={{.TEST_DIR}}/coverage.out
+
+  test-short:
+    desc: Run tests without coverage
+    cmds:
+      - go test -short ./...
+
+  build:
+    desc: Build the binary
+    deps: [clean, format, lint, test]
+    cmds:
+      - go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} {{.MAIN_PACKAGE}}
+
+  install:
+    desc: Install the binary to GOPATH/bin
+    deps: [build]
+    cmds:
+      - go install {{.MAIN_PACKAGE}}
+
+  run:
+    desc: Run the application with example input
+    deps: [build]
+    cmds:
+      - ./{{.BUILD_DIR}}/{{.BINARY_NAME}} example.graph
+
+  dev:
+    desc: Development workflow - format, lint, test
+    cmds:
+      - task: format
+      - task: lint  
+      - task: test-short
