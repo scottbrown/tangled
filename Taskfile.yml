@@ -42,6 +42,11 @@ tasks:
     cmds:
       - gosec ./...
 
+  vuln:
+    desc: Scans for 3rd party lib vulns
+    cmds:
+      - govulncheck ./...
+
   test:
     desc: Run tests with coverage
     deps: [clean]
