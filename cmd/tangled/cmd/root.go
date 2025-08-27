@@ -27,8 +27,9 @@ Example usage:
   tangled deps.graph
   tangled -f html -o deps.html deps.graph
   tangled -f mermaid -o deps.mmd deps.graph`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRoot,
+	Args:    cobra.ExactArgs(1),
+	Version: tangled.Version(),
+	RunE:    runRoot,
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
