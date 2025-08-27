@@ -37,6 +37,11 @@ tasks:
     cmds:
       - go vet ./...
 
+  sast:
+    desc: Scans for code vulns
+    cmds:
+      - gosec ./...
+
   test:
     desc: Run tests with coverage
     deps: [clean]

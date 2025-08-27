@@ -60,7 +60,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	if outputFile == "" || outputFile == "-" {
 		writer = os.Stdout
 	} else {
-		file, err := os.Create(outputFile)
+		file, err := os.Create(outputFile) // #nosec G304 -- CLI tool, output file from user-provided command line flag
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}

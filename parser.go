@@ -44,7 +44,7 @@ func parseModule(moduleStr string) (Module, error) {
 
 // ParseGraphFromFile parses a go mod graph file and returns a DependencyGraph
 func ParseGraphFromFile(filename string) (*DependencyGraph, error) {
-	file, err := os.Open(filename)
+	file, err := os.Open(filename) // #nosec G304 -- CLI tool, filename from user-provided command line argument
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
