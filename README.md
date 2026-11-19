@@ -106,7 +106,7 @@ digraph dependencies {
 
 ### Prerequisites
 
-- Go 1.24.5 or later
+- Go 1.27.4 or later
 - [Task](https://taskfile.dev/) for build automation
 
 ### Building
