@@ -1,6 +1,6 @@
 module github.com/scottbrown/tangled
 
-go 1.24.5
+go 1.27.4
 
 require github.com/spf13/cobra v1.10.2
 
